@@ -16,13 +16,16 @@ func main() {
 	apiCfg := apiConfig{fileserveHits: atomic.Int32{}}
 
 	mux.Handle("GET /app/", middlewareLog(apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("."))))))
-	mux.Handle("GET /healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+	mux.Handle("GET /api/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(200)
 		w.Write([]byte("OK\n"))
 	}))
-	mux.Handle("GET /metrics", http.HandlerFunc(apiCfg.handlerMetrics))
-	mux.Handle("POST /reset", http.HandlerFunc(apiCfg.handlerReset))
+	mux.Handle("POST /api/validate_chirp", http.HandlerFunc(handlerValidateChirp))
+
+	mux.Handle("GET /admin/metrics", http.HandlerFunc(apiCfg.handlerMetrics))
+	mux.Handle("POST /admin/reset", http.HandlerFunc(apiCfg.handlerReset))
 	server.ListenAndServe()
 }
 
