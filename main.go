@@ -42,8 +42,11 @@ func main() {
 		w.WriteHeader(200)
 		w.Write([]byte("OK\n"))
 	}))
-	mux.Handle("POST /api/chirps", http.HandlerFunc(apiCfg.handlerCreateChirp))
 	mux.Handle("POST /api/users", http.HandlerFunc(apiCfg.handlerCreateUser))
+	mux.Handle("POST /api/login", http.HandlerFunc(apiCfg.handlerLogin))
+	mux.Handle("POST /api/chirps", http.HandlerFunc(apiCfg.handlerCreateChirp))
+	mux.Handle("GET /api/chirps", http.HandlerFunc(apiCfg.handleGetChirps))
+	mux.Handle("GET /api/chirps/{chirpID}", http.HandlerFunc(apiCfg.handleGetChirpByID))
 
 	mux.Handle("GET /admin/metrics", http.HandlerFunc(apiCfg.handlerMetrics))
 	mux.Handle("POST /admin/reset", http.HandlerFunc(apiCfg.handlerReset))

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -47,7 +48,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		corrected := maskBannedWords(data.Body)
 		chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
 			UserID: data.UserID,
-			Body: corrected,
+			Body:   corrected,
 		})
 		if err != nil {
 			log.Printf("db.CreateChirp error: %v\n", err)
@@ -80,4 +81,54 @@ func maskBannedWords(msg string) string {
 		}
 	}
 	return strings.Join(corrected, " ")
+}
+
+func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		log.Printf("db.GetChirps error: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(chirps)
+	if err != nil {
+		log.Printf("json marshaling error: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func (cfg *apiConfig) handleGetChirpByID(w http.ResponseWriter, r *http.Request) {
+	cID := r.PathValue("chirpID")
+	uID, err := uuid.Parse(cID)
+	if err != nil {
+		log.Printf("Invalid id: %s\n", cID)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	chirp, err := cfg.db.GetChirpByID(r.Context(), uID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			log.Printf("db.GetChirpByID error: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	data, err := json.Marshal(chirp)
+	if err != nil {
+		log.Printf("json marshaling error: %+v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }
