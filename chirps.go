@@ -5,23 +5,23 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/FooNameBar/chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 type reqBody struct {
-	Body string `json:"body"`
+	Body   string    `json:"body"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 type errResp struct {
 	Error string `json:"error"`
 }
 
-type validResp struct {
-	CleanedBody string `json:"cleaned_body"`
-}
-
 var bannedWords []string = []string{"kerfuffle", "sharbert", "fornax"}
 
-func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
@@ -45,13 +45,23 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusBadRequest
 	} else {
 		corrected := maskBannedWords(data.Body)
-		respData, err = json.Marshal(validResp{CleanedBody: corrected})
+		chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
+			UserID: data.UserID,
+			Body: corrected,
+		})
+		if err != nil {
+			log.Printf("db.CreateChirp error: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		respData, err = json.Marshal(chirp)
 		if err != nil {
 			log.Printf("json.Marshal error: %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		status = http.StatusOK
+		status = http.StatusCreated
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(status)

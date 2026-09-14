@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+
+	"github.com/FooNameBar/chirpy/internal/database"
 )
 
 type apiConfig struct {
 	fileserveHits atomic.Int32
+	db            *database.Queries
+	platform      string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -29,10 +33,4 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 </html>
 `
 	fmt.Fprintf(w, template, cfg.fileserveHits.Load())
-}
-
-func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
-	cfg.fileserveHits = atomic.Int32{}
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Hits reset to 0\n")
 }

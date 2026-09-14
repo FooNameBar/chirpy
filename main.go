@@ -1,19 +1,39 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/FooNameBar/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("godotenv.Load: %v\n", err)
+	}
+
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+
+	dbQueries := database.New(db)
+
+	apiCfg := apiConfig{
+		fileserveHits: atomic.Int32{},
+		db:            dbQueries,
+		platform:      os.Getenv("PLATFORM"),
+	}
+
 	mux := http.NewServeMux()
 	server := http.Server{
 		Handler: mux,
 		Addr:    ":8080",
 	}
-
-	apiCfg := apiConfig{fileserveHits: atomic.Int32{}}
 
 	mux.Handle("GET /app/", middlewareLog(apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("."))))))
 
@@ -22,7 +42,8 @@ func main() {
 		w.WriteHeader(200)
 		w.Write([]byte("OK\n"))
 	}))
-	mux.Handle("POST /api/validate_chirp", http.HandlerFunc(handlerValidateChirp))
+	mux.Handle("POST /api/chirps", http.HandlerFunc(apiCfg.handlerCreateChirp))
+	mux.Handle("POST /api/users", http.HandlerFunc(apiCfg.handlerCreateUser))
 
 	mux.Handle("GET /admin/metrics", http.HandlerFunc(apiCfg.handlerMetrics))
 	mux.Handle("POST /admin/reset", http.HandlerFunc(apiCfg.handlerReset))
