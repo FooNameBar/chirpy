@@ -81,3 +81,36 @@ func (q *Queries) ResetUsers(ctx context.Context) (int64, error) {
 	err := row.Scan(&deleted_count)
 	return deleted_count, err
 }
+
+const updateEmailPassword = `-- name: UpdateEmailPassword :one
+UPDATE users
+SET email=$1,
+hashed_password=$2
+WHERE id=$3
+RETURNING id, created_at, updated_at, email
+`
+
+type UpdateEmailPasswordParams struct {
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
+	ID             uuid.UUID `json:"id"`
+}
+
+type UpdateEmailPasswordRow struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+}
+
+func (q *Queries) UpdateEmailPassword(ctx context.Context, arg UpdateEmailPasswordParams) (UpdateEmailPasswordRow, error) {
+	row := q.db.QueryRowContext(ctx, updateEmailPassword, arg.Email, arg.HashedPassword, arg.ID)
+	var i UpdateEmailPasswordRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+	)
+	return i, err
+}

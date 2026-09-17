@@ -142,3 +142,51 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func (cfg *apiConfig) handlerUpdateLoginInfo(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	userId, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var uReq userAuth
+	defer r.Body.Close()
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&uReq)
+	if err != nil {
+		log.Printf("Something went wrong decoding json %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	hashed_password, err := auth.HashPassword(uReq.Password)
+	if err != nil {
+		log.Printf("Something went wrong hashing password %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	updtdUser, err := cfg.db.UpdateEmailPassword(r.Context(), database.UpdateEmailPasswordParams{
+		Email: uReq.Email,
+		HashedPassword: hashed_password,
+		ID: userId,
+	})
+
+	resData, err := json.Marshal(updtdUser)
+	if err != nil {
+		log.Printf("Something went wrong marshaling json %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resData)
+}

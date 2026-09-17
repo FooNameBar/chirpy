@@ -44,6 +44,7 @@ func main() {
 		w.Write([]byte("OK\n"))
 	}))
 	mux.Handle("POST /api/users", http.HandlerFunc(apiCfg.handlerCreateUser))
+	mux.Handle("PUT /api/users", http.HandlerFunc(apiCfg.handlerUpdateLoginInfo))
 	mux.Handle("POST /api/login", http.HandlerFunc(apiCfg.handlerLogin))
 	mux.Handle("POST /api/chirps", http.HandlerFunc(apiCfg.handlerCreateChirp))
 	mux.Handle("GET /api/chirps", http.HandlerFunc(apiCfg.handleGetChirps))
