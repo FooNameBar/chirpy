@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/FooNameBar/chirpy/internal/auth"
 	"github.com/FooNameBar/chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
 type reqBody struct {
 	Body   string    `json:"body"`
-	UserID uuid.UUID `json:"user_id"`
 }
 
 type errResp struct {
@@ -23,6 +23,7 @@ type errResp struct {
 var bannedWords []string = []string{"kerfuffle", "sharbert", "fornax"}
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
+
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
@@ -31,6 +32,19 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		log.Printf("Something went wrong decoding %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	tokenStr, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Something went wrong getting bearer token %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	userId, err := auth.ValidateJWT(tokenStr, cfg.secret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -47,7 +61,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	} else {
 		corrected := maskBannedWords(data.Body)
 		chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
-			UserID: data.UserID,
+			UserID: userId,
 			Body:   corrected,
 		})
 		if err != nil {

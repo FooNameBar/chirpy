@@ -27,6 +27,7 @@ func main() {
 		fileserveHits: atomic.Int32{},
 		db:            dbQueries,
 		platform:      os.Getenv("PLATFORM"),
+		secret:        os.Getenv("JWT_SECRET"),
 	}
 
 	mux := http.NewServeMux()

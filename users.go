@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/FooNameBar/chirpy/internal/auth"
 	"github.com/FooNameBar/chirpy/internal/database"
@@ -14,6 +15,11 @@ import (
 type userAuth struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type userAuthTimed struct {
+	userAuth
+	ExpiresInSeconds time.Duration `json:"expires_in_seconds"`
 }
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -76,12 +82,16 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
-	var uReq userAuth
+	var uReq userAuthTimed
 	err := decoder.Decode(&uReq)
 	if err != nil {
 		log.Printf("Something went wrong decoding %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	if uReq.ExpiresInSeconds == 0 || uReq.ExpiresInSeconds > time.Hour*1 {
+		uReq.ExpiresInSeconds = time.Hour * 1
 	}
 
 	user, err := cfg.db.GetUserByEmail(r.Context(), uReq.Email)
@@ -96,11 +106,24 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userWNoPass := database.CreateUserRow{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+	token, err := auth.MakeJWT(user.ID, cfg.secret, uReq.ExpiresInSeconds)
+	if err != nil {
+		log.Printf("Something went wrong making jwt %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	userWNoPass := struct {
+		database.CreateUserRow
+		Token string `json:"token"`
+	}{
+		CreateUserRow: database.CreateUserRow{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+		Token: token,
 	}
 
 	resData, err := json.Marshal(userWNoPass)
