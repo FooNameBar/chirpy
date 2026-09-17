@@ -77,3 +77,23 @@ func TestGetBearerToken(t *testing.T) {
 		t.Fatalf("\nOriginal:\t%s\nReturned:\t%s\n", token, returnedStr)
 	}
 }
+
+func TestGetBearerTokenRefresh(t *testing.T) {
+	req, err := http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v\n", err)
+	}
+	header := req.Header
+
+	refToken := MakeRefreshToken()
+	header.Add("Authorization", fmt.Sprintf("Bearer %s", refToken))
+
+	returnedStr, err := GetBearerToken(header)
+	if err != nil {
+		t.Fatalf("GetBearerToken: %v\n", err)
+	}
+
+	if refToken != returnedStr {
+		t.Fatalf("\nOriginal:\t%s\nReturned:\t%s\n", refToken, returnedStr)
+	}
+}

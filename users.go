@@ -17,11 +17,6 @@ type userAuth struct {
 	Password string `json:"password"`
 }
 
-type userAuthTimed struct {
-	userAuth
-	ExpiresInSeconds time.Duration `json:"expires_in_seconds"`
-}
-
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
@@ -82,16 +77,12 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
-	var uReq userAuthTimed
+	var uReq userAuth
 	err := decoder.Decode(&uReq)
 	if err != nil {
 		log.Printf("Something went wrong decoding %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-
-	if uReq.ExpiresInSeconds == 0 || uReq.ExpiresInSeconds > time.Hour*1 {
-		uReq.ExpiresInSeconds = time.Hour * 1
 	}
 
 	user, err := cfg.db.GetUserByEmail(r.Context(), uReq.Email)
@@ -106,16 +97,19 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.secret, uReq.ExpiresInSeconds)
+	token, err := auth.MakeJWT(user.ID, cfg.secret, time.Hour)
 	if err != nil {
 		log.Printf("Something went wrong making jwt %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	refreshToken := auth.MakeRefreshToken()
+
 	userWNoPass := struct {
 		database.CreateUserRow
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}{
 		CreateUserRow: database.CreateUserRow{
 			ID:        user.ID,
@@ -123,7 +117,8 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
 		},
-		Token: token,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}
 
 	resData, err := json.Marshal(userWNoPass)
@@ -135,4 +130,15 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(resData)
+
+	_, err = cfg.db.AddRefreshToken(r.Context(), database.AddRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	})
+	if err != nil {
+		log.Printf("Something went wrong adding refresh token %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
