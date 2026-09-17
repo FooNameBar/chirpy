@@ -112,10 +112,11 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refresh_token"`
 	}{
 		CreateUserRow: database.CreateUserRow{
-			ID:        user.ID,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-			Email:     user.Email,
+			ID:          user.ID,
+			CreatedAt:   user.CreatedAt,
+			UpdatedAt:   user.UpdatedAt,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		},
 		Token:        token,
 		RefreshToken: refreshToken,
@@ -174,9 +175,9 @@ func (cfg *apiConfig) handlerUpdateLoginInfo(w http.ResponseWriter, r *http.Requ
 	}
 
 	updtdUser, err := cfg.db.UpdateEmailPassword(r.Context(), database.UpdateEmailPasswordParams{
-		Email: uReq.Email,
+		Email:          uReq.Email,
 		HashedPassword: hashed_password,
-		ID: userId,
+		ID:             userId,
 	})
 
 	resData, err := json.Marshal(updtdUser)
