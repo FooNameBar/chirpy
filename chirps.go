@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/FooNameBar/chirpy/internal/auth"
@@ -13,7 +14,7 @@ import (
 )
 
 type reqBody struct {
-	Body   string    `json:"body"`
+	Body string `json:"body"`
 }
 
 type errResp struct {
@@ -98,11 +99,35 @@ func maskBannedWords(msg string) string {
 }
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetChirps(r.Context())
-	if err != nil {
-		log.Printf("db.GetChirps error: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	userIdStr := r.URL.Query().Get("author_id")
+	sortStr := r.URL.Query().Get("sort")
+
+	var chirps []database.Chirp
+	var err error
+	if userIdStr == "" {
+		chirps, err = cfg.db.GetChirps(r.Context())
+		if err != nil {
+			log.Printf("db.GetChirps error: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	} else {
+		userId, err := uuid.Parse(userIdStr)
+		if err != nil {
+			log.Printf("uuid parse error: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		chirps, err = cfg.db.GetChirpsByUser(r.Context(), userId)
+		if err != nil {
+			log.Printf("db.GetChirps error: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if sortStr == "desc"{
+		slices.Reverse(chirps)
 	}
 
 	data, err := json.Marshal(chirps)

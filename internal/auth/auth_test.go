@@ -97,3 +97,23 @@ func TestGetBearerTokenRefresh(t *testing.T) {
 		t.Fatalf("\nOriginal:\t%s\nReturned:\t%s\n", refToken, returnedStr)
 	}
 }
+
+func TestGetAPIKey(t *testing.T) {
+	req, err := http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v\n", err)
+	}
+	header := req.Header
+
+	key := "f271c81ff7084ee5b99a5091b42d486e"
+	header.Add("Authorization", fmt.Sprintf("ApiKey %s", key))
+
+	returnedStr, err := GetAPIKey(header)
+	if err != nil {
+		t.Fatalf("GetAPIKey: %v\n", err)
+	}
+
+	if key != returnedStr {
+		t.Fatalf("\nOriginal:\t%s\nReturned:\t%s\n", key, returnedStr)
+	}
+}

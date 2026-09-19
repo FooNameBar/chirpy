@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/FooNameBar/chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -16,11 +17,16 @@ type eventReq struct {
 }
 
 func (cfg *apiConfig) handleUpgradeUser(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil || apiKey != cfg.polkaKey {
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
 
 	var eReq eventReq
-	err := decoder.Decode(&eReq)
+	err = decoder.Decode(&eReq)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
